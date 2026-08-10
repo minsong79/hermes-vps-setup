@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# memory-sync — sync Hermes memory files (MEMORY.md, USER.md) to a shared
+# private GitHub repo so multiple machines keep identical memory/personality.
+#
+# Usage:
+#   memory-sync pull    # fetch remote memory into local Hermes home (run before a session)
+#   memory-sync push    # push local memory up to the remote repo (run after memory changes)
+#   memory-sync status  # show local vs remote state
+#
+# Works on both Linux (VPS) and macOS (MacBook). Requires git + SSH auth to GitHub.
+set -euo pipefail
+
+# --- Config ---
+REPO_URL="git@github.com:minsong79/hermes-memory.git"
+MEM_FILES=(MEMORY.md USER.md)
+
+# Resolve Hermes home: HERMES_HOME if set, else a sensible default per-OS.
+if [ -n "${HERMES_HOME:-}" ]; then
+  HERMES_HOME_DIR="$HERMES_HOME"
+elif [ "$(uname)" = "Darwin" ]; then
+  HERMES_HOME_DIR="$HOME/.hermes"
+else
+  HERMES_HOME_DIR="/opt/data"
+fi
+MEM_DIR="$HERMES_HOME_DIR/memories"
+SYNC_DIR="$HERMES_HOME_DIR/memory-sync"
+
+log() { printf '[memory-sync] %s\n' "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+ensure_clone() {
+  mkdir -p "$SYNC_DIR" "$MEM_DIR"
+  if [ ! -d "$SYNC_DIR/.git" ]; then
+    log "cloning $REPO_URL -> $SYNC_DIR"
+    git clone "$REPO_URL" "$SYNC_DIR"
+  fi
+}
+
+apply_to_hermes() {
+  for f in "${MEM_FILES[@]}"; do
+    if [ -f "$SYNC_DIR/$f" ]; then
+      cp "$SYNC_DIR/$f" "$MEM_DIR/$f"
+      log "applied $f -> $MEM_DIR/"
+    else
+      log "note: $f not in repo yet - nothing to apply"
+    fi
+  done
+}
+
+capture_from_hermes() {
+  for f in "${MEM_FILES[@]}"; do
+    if [ -f "$MEM_DIR/$f" ]; then
+      cp "$MEM_DIR/$f" "$SYNC_DIR/$f"
+    fi
+  done
+}
+
+cmd_pull() {
+  ensure_clone
+  git -C "$SYNC_DIR" pull --rebase "$@" || die "pull failed (conflict?)"
+  apply_to_hermes
+  log "pull complete - memory now matches remote"
+}
+
+cmd_push() {
+  ensure_clone
+  git -C "$SYNC_DIR" pull --rebase 2>/dev/null || true
+  capture_from_hermes
+  if git -C "$SYNC_DIR" status --porcelain | grep -q .; then
+    git -C "$SYNC_DIR" add "${MEM_FILES[@]}"
+    git -C "$SYNC_DIR" commit -m "sync memory: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    log "changes committed locally"
+  else
+    log "no local memory changes to push"
+  fi
+  git -C "$SYNC_DIR" push || die "push failed"
+  log "push complete - remote memory updated"
+}
+
+cmd_status() {
+  ensure_clone
+  git -C "$SYNC_DIR" fetch
+  echo "== local clone =="
+  git -C "$SYNC_DIR" log -1 --oneline 2>/dev/null || echo "(no commits yet)"
+  echo "== remote =="
+  git -C "$SYNC_DIR" log -1 --oneline origin/main 2>/dev/null || echo "(no remote/main)"
+  echo "== local working changes =="
+  git -C "$SYNC_DIR" status --short || true
+}
+
+case "${1:-}" in
+  pull)   cmd_pull   ;;
+  push)   cmd_push   ;;
+  status) cmd_status ;;
+  *) die "usage: $0 {pull|push|status}" ;;
+esac
