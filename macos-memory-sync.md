@@ -18,22 +18,25 @@ The shared store is the private GitHub repo **`minsong79/hermes-memory`**.
 ### 1. Requirements
 - `git` (Xcode CLT: `xcode-select --install`)
 - SSH access to GitHub (`ssh -T git@github.com` should say
-  "Hi minsong79! You've successfully authenticated")
+  "Hi minsong79! You've successfully authenticated"). Add your Mac's SSH public
+  key at github.com/settings/keys if not already there.
 
-### 2. Install the sync script
+### 2. Get the sync script (private-repo-safe: clone over SSH, not curl)
 ```bash
-curl -fsSL -o /usr/local/bin/memory-sync \
-  <raw-url-of-memory-sync-or-the-hermes-vps-setup-repo>
+git clone git@github.com:minsong79/hermes-vps-setup.git /tmp/hermes-vps-setup
+sudo cp /tmp/hermes-vps-setup/memory-sync /usr/local/bin/memory-sync
 chmod +x /usr/local/bin/memory-sync
+rm -rf /tmp/hermes-vps-setup
 ```
-(Or copy `memory-sync` from the VPS workspace `bin/` if you prefer.)
+> `hermes-vps-setup` is private, so you must clone over SSH — the raw GitHub URL
+> won't work without a token.
 
 ### 3. First sync (pull the memory baseline into your Mac)
 ```bash
 HERMES_HOME="$HOME/.hermes" memory-sync pull
 ```
-This clones the `hermes-memory` repo, then copies `MEMORY.md`/`USER.md` into
-`~/hermes-memory/` → applies them to `~/.hermes/memories/`.
+This clones the `hermes-memory` repo, then applies `MEMORY.md`/`USER.md` into
+`~/.hermes/memories/`.
 
 ### 4. Normal workflow on the Mac
 - **Start of a session:** `memory-sync pull`
@@ -41,9 +44,8 @@ This clones the `hermes-memory` repo, then copies `MEMORY.md`/`USER.md` into
 
 ## Recommended: make it automatic
 
-Add to your shell rc (`~/.zshrc`) so every new terminal pulls before use:
+Add to `~/.zshrc` so every new terminal pulls before use:
 ```bash
-# Optional — pull latest memory at the start of a shell session
 if command -v memory-sync >/dev/null 2>&1; then
   memory-sync pull >/dev/null 2>&1 || true
 fi
