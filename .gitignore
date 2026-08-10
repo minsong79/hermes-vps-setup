@@ -3,10 +3,15 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.egg-info/
 
 # Environment / secrets
 .env
 .env.*
+
+# Runtime data & logs
+data/
+logs/
 
 # Editors / OS
 .idea/
