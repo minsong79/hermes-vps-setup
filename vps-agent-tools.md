@@ -72,10 +72,23 @@ fi
 Claude Code + Codex + ensure-tools updates are driven by a scheduled task on the VPS
 Hermes — cron job **`vps-agent-tools-update`** (id `a1ea9ef82396`, daily `0 3 * * *`,
 `--no-agent` watchdog). It runs `/opt/data/scripts/vps-tools-update.sh`, which:
-1. Runs `/opt/data/bin/ensure-tools.sh` (reinstalls unzip/bzip2 after a redeploy).
-2. Updates Claude Code in place: `npm install -g --prefix /opt/data/claude-code-prefix --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code`.
-3. Updates Codex in place: `npm install -g --prefix /opt/data/codex-prefix @openai/codex`.
-4. Reports only what changed (silent = nothing to do).
+1. Runs `/opt/data/bin/ensure-tools.sh` (reinstalls unzip/bzip2/bubblewrap after a redeploy).
+2. **AUTH CHECKS both CLIs** (runs even if there's nothing to update):
+   - Claude: exports `CLAUDE_CODE_OAUTH_TOKEN` from `.env` (the cron runs as root and
+     does NOT inherit the gateway env — without the export `claude auth status` reports
+     "Not logged in"), verifies `.credentials.json` + env var, probes `claude auth
+     status`. Repairs: chowns `.claude`, restores env var from `.token_oat` backup.
+   - Codex: chowns `.codex`, probes a 1-turn `codex exec`.
+   - Any failure emits a **"REAUTH-NEEDED (interactive)"** alert — headless jobs can't
+     re-login via browser, so they detect + alert rather than silently break.
+3. Updates Claude Code in place: `npm install -g --prefix /opt/data/claude-code-prefix --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code`.
+4. Updates Codex in place: `npm install -g --prefix /opt/data/codex-prefix @openai/codex`.
+5. Reports only what changed or failed (silent = all OK, nothing to do).
+
+npm updates write only to the `/opt/data/*-prefix` dirs and do NOT touch the auth files
+(both on the persistent volume), so updates do not break auth — the check is a safety
+net. Verified 2026-08-20: happy path (all OK) and failure path (missing auth.json →
+REAUTH alert) both confirmed.
 
 Script path resolution on this deployment: `--script` names resolve under
 `/opt/data/scripts/` (NOT `/opt/data/home/.hermes/scripts/`). Fixed 2026-08-20:
