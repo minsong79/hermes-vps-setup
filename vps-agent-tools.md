@@ -62,8 +62,13 @@ fi
 
 ## Scheduling
 Claude Code + Codex + ensure-tools updates are driven by a scheduled task on the VPS
-Hermes (see the cron job `vps-agent-tools-update`). It:
-1. Runs `/opt/data/bin/ensure-tools.sh`.
+Hermes — cron job **`vps-agent-tools-update`** (id `a1ea9ef82396`, daily `0 3 * * *`,
+`--no-agent` watchdog). It runs `/opt/data/scripts/vps-tools-update.sh`, which:
+1. Runs `/opt/data/bin/ensure-tools.sh` (reinstalls unzip/bzip2 after a redeploy).
 2. Updates Claude Code in place: `npm install -g --prefix /opt/data/claude-code-prefix --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code`.
 3. Updates Codex in place: `npm install -g --prefix /opt/data/codex-prefix @openai/codex`.
-4. Reports what changed.
+4. Reports only what changed (silent = nothing to do).
+
+Script path resolution on this deployment: `--script` names resolve under
+`/opt/data/scripts/` (NOT `/opt/data/home/.hermes/scripts/` — the existing
+`memory-periodic-pull` job is currently broken for loading from the wrong dir).
