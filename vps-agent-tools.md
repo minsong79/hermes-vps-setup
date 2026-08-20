@@ -36,6 +36,11 @@ Auth: headless OAuth token (subscription limits, not API meter) from
 `/opt/data/.claude/.credentials.json` + `CLAUDE_CODE_OAUTH_TOKEN` in `.env`.
 
 ## Codex (OpenAI CLI)
+Auth: configured via **ChatGPT OAuth** (subscription, not API meter). Session at
+`/opt/data/.codex/auth.json` (mode 600). `.codex` dir MUST be owned by `10000:10000`
+or Codex errors ("failed to initialize in-process app-server client"). Run with
+`HOME=/opt/data` + `PATH=/opt/data/codex-prefix/bin:$PATH`; use `--skip-git-repo-check`
+outside a trusted git dir. Verified working (real exec task succeeded).
 ```bash
 ssh oracle-vps
 sudo docker exec -u 0 hermes-qr2vu9hwbfsifazoar3rxfyo sh -c \
@@ -70,5 +75,8 @@ Hermes — cron job **`vps-agent-tools-update`** (id `a1ea9ef82396`, daily `0 3 
 4. Reports only what changed (silent = nothing to do).
 
 Script path resolution on this deployment: `--script` names resolve under
-`/opt/data/scripts/` (NOT `/opt/data/home/.hermes/scripts/` — the existing
-`memory-periodic-pull` job is currently broken for loading from the wrong dir).
+`/opt/data/scripts/` (NOT `/opt/data/home/.hermes/scripts/`). Fixed 2026-08-20:
+`memory-periodic-pull` needed the script in `/opt/data/scripts/` + `GIT_SSH_COMMAND`
+pointing at hermes's key (`ssh -F /opt/data/.ssh/config -i /opt/data/.ssh/id_ed25519`)
+because the cron job runs as root (no GitHub key) + `safe.directory` in system
+gitconfig. Both cron jobs now report `ok`.
