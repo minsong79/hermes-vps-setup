@@ -52,6 +52,31 @@ sudo docker exec hermes-qr2vu9hwbfsifazoar3rxfyo \
 ```
 (Codex doesn't have a gated postinstall like Claude Code, so no `--allow-scripts` needed.)
 
+## Default model & permission settings (full-auto)
+Both CLIs are configured to run **fully autonomously — no permission prompts** on
+delegation, with the requested model + effort. These are the durable defaults (on
+`/opt/data`, survive redeploy):
+
+**Claude Code** — `/opt/data/.claude/settings.json`:
+```json
+{ "model": "opus", "permissionMode": "bypassPermissions" }
+```
+Plus `CLAUDE_CODE_EFFORT_LEVEL=high` in `.env`. (`permissionMode: bypassPermissions`
+= auto-accept everything, never asks. `model: opus` = latest Opus family.)
+Note: auth uses a long-lived/inference-scope token, so `Remote Control` is not
+available — that's fine for delegation.
+
+**Codex** — `/opt/data/.codex/config.toml`:
+```toml
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+approval_policy = "never"          # full auto, never asks
+sandbox_mode = "workspace-write"   # auto-approves writes within sandbox
+model_provider = "openai"
+```
+(Validated with `codex --strict-config` — no unknown fields; `exec` header confirms
+`model: gpt-5.6-sol`, `approval: never`, `reasoning effort: high`.)
+
 ## ensure-tools.sh (system tools, survives via /opt/data)
 Script lives at `/opt/data/bin/ensure-tools.sh` and is invoked by a scheduled task so
 tools reappear after any redeploy:
