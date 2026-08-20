@@ -41,21 +41,31 @@ This clones the `hermes-memory` repo, then applies `MEMORY.md`/`USER.md` into
 ### 4. Normal workflow on the Mac
 - **Start of a session:** `memory-sync pull`
 - **End / after the agent remembers something:** `memory-sync push`
+- In practice this is now **automatic** — see below.
 
-## Recommended: make it automatic
+## Recommended: make it automatic (bidirectional, every 15 min)
 
-Add to `~/.zshrc` so every new terminal pulls before use:
-```bash
-if command -v memory-sync >/dev/null 2>&1; then
-  memory-sync pull >/dev/null 2>&1 || true
-fi
-```
+**Mac** — launchd LaunchAgent `com.hermes.memory.autopush` runs
+`~/.hermes/bin/memory-auto-sync.sh` every 15 min. It **pulls** remote changes into
+the Mac when remote is genuinely newer, then **pushes** Mac changes to GitHub when
+the Mac's live memory differs. Silent when nothing changed.
+
+**VPS (always on, the sync hub)** — Hermes cron job `memory-periodic-sync`
+(id `67c6c977c714`) runs `/opt/data/scripts/memory-periodic-sync.sh` every 15 min.
+It **pulls** Mac pushes into VPS live memory (freshness-gated) and **pushes** VPS
+memory changes to GitHub. Because the VPS is always on, Mac pushes are picked up
+within ~15 min and never lost, even if the Mac is off at push time (the change sits
+on GitHub until the Mac's next sync pulls it).
+
+**Why every 15 min on both:** pushing to GitHub does NOT update either machine's
+live memory — each machine must `pull` to receive changes. The always-on VPS polling
+every 15 min closes the old 4-hour gap. A real-time "push triggers pull on the VPS"
+webhook is unnecessary because the VPS stays in sync by polling.
 
 ## Conflict note
-Because two machines can edit memory, pull before you start (get the other
-machine's changes) and push after you're done. If `git pull --rebase` ever
-reports a conflict, resolve it inside `~/memory-sync/` (keep the union of both
-versions), commit, and push.
+Because both machines can edit memory, each sync does `git pull --rebase` before
+pushing. If a genuine conflict ever appears, resolve it inside `<sync-dir>/`
+(keep the union), commit, and push.
 
 ## Verify
 ```bash
