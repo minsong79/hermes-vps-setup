@@ -27,6 +27,7 @@ persistence is the `/opt/data` bind-mount. So:
 | tar | 1.35 | baked in image | yes |
 | unzip | reinstalled by ensure-tools | /usr/bin/unzip | no (re-run script) |
 | bzip2 | reinstalled by ensure-tools | /usr/bin/bzip2 | no (re-run script) |
+| bubblewrap (bwrap) | reinstalled by ensure-tools | /usr/bin/bwrap | no (re-run script) |
 | Claude Code | @anthropic-ai/claude-code | /opt/data/claude-code-prefix | yes |
 | Codex | @openai/codex | /opt/data/codex-prefix | yes |
 
@@ -40,7 +41,8 @@ Auth: configured via **ChatGPT OAuth** (subscription, not API meter). Session at
 `/opt/data/.codex/auth.json` (mode 600). `.codex` dir MUST be owned by `10000:10000`
 or Codex errors ("failed to initialize in-process app-server client"). Run with
 `HOME=/opt/data` + `PATH=/opt/data/codex-prefix/bin:$PATH`; use `--skip-git-repo-check`
-outside a trusted git dir. Verified working (real exec task succeeded).
+outside a trusted git dir. Verified working (real exec task succeeded). System
+`bubblewrap` is installed (no more bundled-fallback warning on sandboxed runs).
 ```bash
 ssh oracle-vps
 sudo docker exec -u 0 hermes-qr2vu9hwbfsifazoar3rxfyo sh -c \
@@ -58,8 +60,9 @@ tools reappear after any redeploy:
 set -e
 # idempotent: only install when missing
 need=""
-command -v unzip >/dev/null 2>&1 || need="$need unzip"
-command -v bzip2 >/dev/null 2>&1 || need="$need bzip2"
+for t in unzip bzip2 bubblewrap; do
+  command -v "$t" >/dev/null 2>&1 || need="$need $t"
+done
 if [ -n "$need" ]; then
   apt-get update -y && apt-get install -y $need
 fi
