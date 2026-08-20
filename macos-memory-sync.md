@@ -50,17 +50,35 @@ This clones the `hermes-memory` repo, then applies `MEMORY.md`/`USER.md` into
 the Mac when remote is genuinely newer, then **pushes** Mac changes to GitHub when
 the Mac's live memory differs. Silent when nothing changed.
 
-**VPS (always on, the sync hub)** — Hermes cron job `memory-periodic-sync`
-(id `67c6c977c714`) runs `/opt/data/scripts/memory-periodic-sync.sh` every 15 min.
+**VPS (always on, the sync hub)** — a **systemd timer** `hermes-memory-sync.timer`
+on the VPS host runs `hermes-memory-sync.service` every 15 min, which
+`docker exec`s `/opt/data/scripts/memory-periodic-sync.sh` in the container.
 It **pulls** Mac pushes into VPS live memory (freshness-gated) and **pushes** VPS
 memory changes to GitHub. Because the VPS is always on, Mac pushes are picked up
 within ~15 min and never lost, even if the Mac is off at push time (the change sits
 on GitHub until the Mac's next sync pulls it).
+> NOTE: the systemd timer replaced the VPS Hermes cron job (`memory-periodic-sync`,
+> id `67c6c977c714`) because that deployment's Hermes scheduler wasn't reliably
+> firing scheduled jobs ("fire claim lost; execution was not started"). The cron
+> job is paused; the systemd timer is authoritative.
 
 **Why every 15 min on both:** pushing to GitHub does NOT update either machine's
 live memory — each machine must `pull` to receive changes. The always-on VPS polling
 every 15 min closes the old 4-hour gap. A real-time "push triggers pull on the VPS"
 webhook is unnecessary because the VPS stays in sync by polling.
+
+## Adding another machine (works with any number)
+The architecture scales to any number of Macs/machines. Each new machine:
+1. **Auth:** add its SSH public key to the `minsong79` GitHub account (so
+   `git@github.com:minsong79/hermes-memory.git` works). One machine can use multiple
+   keys — each machine's key authenticates independently.
+2. **Tool:** `git clone git@github.com:minsong79/hermes-vps-setup.git`, copy
+   `memory-sync` to `/usr/local/bin/memory-sync`, `chmod +x`.
+3. **First sync:** `memory-sync pull` (clones + applies baseline into `~/.hermes/memories/`).
+4. **Automate:** install the Mac launchd agent (or Linux cron/systemd timer on the
+   new machine) running the bidirectional sync every ~15 min, mirroring this machine.
+Because every machine does pull+push on the same GitHub repo with rebase, they all
+converge — no machine is special, and each is resilient to the others being offline.
 
 ## Conflict note
 Because both machines can edit memory, each sync does `git pull --rebase` before
